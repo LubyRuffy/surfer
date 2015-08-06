@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/henrylee2cn/surfer/errors"
+	"github.com/henrylee2cn/surfer/util"
 )
 
 // Attr represents a Download capability.
@@ -101,22 +102,22 @@ func (self *Download) Download(method string, u string, ref string, data url.Val
 
 // Get requests the given URL using the GET method.
 func (self *Download) Get(u string, header http.Header, cookies []*http.Cookie) (*http.Response, error) {
-	ur, err := url.Parse(u)
+	urlObj, err := util.UrlEncode(u)
 	if err != nil {
 		return nil, err
 	}
-	client := self.buildClient(ur.Scheme, self.proxy)
-	return self.httpGET(ur, "", header, cookies, client)
+	client := self.buildClient(urlObj.Scheme, self.proxy)
+	return self.httpGET(urlObj, "", header, cookies, client)
 }
 
 // Open requests the given URL using the HEAD method.
 func (self *Download) Head(u string, header http.Header, cookies []*http.Cookie) (*http.Response, error) {
-	ur, err := url.Parse(u)
+	urlObj, err := util.UrlEncode(u)
 	if err != nil {
 		return nil, err
 	}
-	client := self.buildClient(ur.Scheme, self.proxy)
-	return self.httpHEAD(ur, "", header, cookies, client)
+	client := self.buildClient(urlObj.Scheme, self.proxy)
+	return self.httpHEAD(urlObj, "", header, cookies, client)
 }
 
 // PostForm requests the given URL using the POST method with the given data.
@@ -143,12 +144,12 @@ func (self *Download) PostMultipart(u string, ref string, data url.Values, heade
 
 // Post requests the given URL using the POST method.
 func (self *Download) Post(u string, ref string, contentType string, body io.Reader, header http.Header, cookies []*http.Cookie) (*http.Response, error) {
-	ur, err := url.Parse(u)
+	urlObj, err := util.UrlEncode(u)
 	if err != nil {
 		return nil, err
 	}
-	client := self.buildClient(ur.Scheme, self.proxy)
-	return self.httpPOST(ur, ref, contentType, body, header, cookies, client)
+	client := self.buildClient(urlObj.Scheme, self.proxy)
+	return self.httpPOST(urlObj, ref, contentType, body, header, cookies, client)
 }
 
 // -- Unexported methods --
