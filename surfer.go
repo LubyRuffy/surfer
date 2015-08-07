@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"mime/multipart"
 	"net/http"
@@ -292,8 +291,6 @@ func (self *Surf) buildRequest(method, url string, ref string, body io.Reader, h
 			req.Header.Set("User-Agent", self.userAgents["all"][r.Intn(l)])
 		}
 	}
-
-	log.Println(req.UserAgent())
 
 	if self.sendReferer {
 		req.Header.Set("Referer", ref)
