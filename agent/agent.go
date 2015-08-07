@@ -13,19 +13,6 @@ import (
 	"text/template"
 )
 
-var (
-	// Name is the name of the browser.
-	Name = "Surf"
-	// Version is the browser version.
-	Version = "1.0"
-	// OSName is the operating system name.
-	OSName = osName()
-	// OSVersion is the operating system version.
-	OSVersion = osVersion()
-	// Comments are additional comments to add to a user agent string.
-	Comments = []string{runtime.Version()}
-)
-
 const (
 	// Windows operating system.
 	Windows int = iota
@@ -46,9 +33,12 @@ type TemplateData struct {
 
 // OSAttributes stores OS attributes.
 type OSAttributes struct {
-	OSName    string
+	// OSName is the operating system name.
+	OSName string
+	// OSVersion is the operating system version.
 	OSVersion string
-	Comments  []string
+	// Comments are additional comments to add to a user agent string.
+	Comments []string
 }
 
 // DefaultOSAttributes stores default OS attributes.
@@ -59,6 +49,8 @@ var DefaultOSAttributes = map[int]OSAttributes{
 }
 
 // Formats is a collection of UA format strings.
+// key is the browser version.
+// value is the browser info.
 type Formats map[string]string
 
 // UAData stores information on a browser user agent.
@@ -69,6 +61,7 @@ type UAData struct {
 }
 
 // UATable is a collection of UAData values.
+// key is the name of the browser.
 type UATable map[string]UAData
 
 // Database is the "database" of user agents.
@@ -206,74 +199,50 @@ var Database = UATable{
 	},
 }
 
-// Chrome returns a user agent string for the most recent version of the Chrome browser.
-func Chrome() string {
-	return createFromDefaults("Chrome")
-}
+// 全部UserAgent
+var UserAgents = map[string][]string{}
 
-// Firefox returns a user agent string for the most recent version of the Firefox browser.
-func Firefox() string {
-	return createFromDefaults("Firefox")
-}
+func init() {
+	for browser, userAgentData := range Database {
+		if browser == "default" {
+			continue
+		}
+		os := userAgentData.DefaultOS
+		osAttribs := DefaultOSAttributes[os]
+		for version, _ := range userAgentData.Formats {
+			ua := createFromDetails(
+				browser,
+				version,
+				osAttribs.OSName,
+				osAttribs.OSVersion,
+				osAttribs.Comments)
+			UserAgents["all"] = append(UserAgents["all"], ua)
 
-// MSIE returns a user agent string for most recent version of the Microsoft Internet Explorer.
-func MSIE() string {
-	return createFromDefaults("MSIE")
-}
-
-// Safari returns a user agent string for the most recent version of the Safari browser.
-func Safari() string {
-	return createFromDefaults("Safari")
-}
-
-// AOL returns a user agent string for the most recent version of the AOL browser.
-func AOL() string {
-	return createFromDefaults("AOL")
-}
-
-// Opera returns a user agent string for the most recent version of the Opera browser.
-func Opera() string {
-	return createFromDefaults("Opera")
-}
-
-// ITunes returns a user agent string for the most recent version of the iTunes media player.
-func ITunes() string {
-	return createFromDefaults("ITunes")
-}
-
-// Konqueror returns a user agent string for the most recent version of the Konqueror browser.
-func Konqueror() string {
-	return createFromDefaults("Konqueror")
-}
-
-// Netscape returns a user agent string for the most recent version of the Netscape Navigator browser.
-func Netscape() string {
-	return createFromDefaults("Netscape")
-}
-
-// Lynx returns a user agent string for the most recent version of the Lynx cli browser.
-func Lynx() string {
-	return createFromDefaults("Lynx")
-}
-
-// GoogleBot returns a user agent string for the most recent version of the GoogleBot crawler.
-func GoogleBot() string {
-	return createFromDefaults("GoogleBot")
-}
-
-// BingBot returns a user agent string for the most recent version of the BingBot crawler.
-func BingBot() string {
-	return createFromDefaults("BingBot")
-}
-
-// YahooBot returns a user agent string for the most recent version of the YahooBot crawler.
-func YahooBot() string {
-	return createFromDefaults("YahooBot")
+			if browser != "itunes" && browser != "lynx" && browser != "googlebot" && browser != "bingbot" && browser != "yahoobot" {
+				UserAgents["common"] = append(UserAgents["common"], ua)
+			}
+		}
+	}
 }
 
 // Create generates and returns a complete user agent string.
-func Create() string {
-	return createFromDetails(Name, Version, OSName, OSVersion, Comments)
+func CreateReal() string {
+	return createFromDetails("Surfer", "1.0", osName(), osVersion(), []string{runtime.Version()})
+}
+
+// CreateDefault returns a user agent string using default values.
+func CreateDefault(browser string) string {
+	bn := strings.ToLower(browser)
+	data := Database[bn]
+	os := data.DefaultOS
+	osAttribs := DefaultOSAttributes[os]
+
+	return createFromDetails(
+		browser,
+		data.TopVersion,
+		osAttribs.OSName,
+		osAttribs.OSVersion,
+		osAttribs.Comments)
 }
 
 // CreateVersion generates and returns a complete user agent string for a specific browser version.
@@ -322,21 +291,6 @@ func Format(bname, bver string) string {
 	}
 
 	return Database["default"].Formats["1"]
-}
-
-// createFromDefaults returns a user agent string using default values.
-func createFromDefaults(browser string) string {
-	bn := strings.ToLower(browser)
-	data := Database[bn]
-	os := data.DefaultOS
-	osAttribs := DefaultOSAttributes[os]
-
-	return createFromDetails(
-		browser,
-		data.TopVersion,
-		osAttribs.OSName,
-		osAttribs.OSVersion,
-		osAttribs.Comments)
 }
 
 // createFromDetails generates and returns a complete user agent string.
