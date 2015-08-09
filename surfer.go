@@ -286,9 +286,9 @@ func (self *Surf) buildRequest(method, url string, ref string, body io.Reader, h
 		if self.useCookie {
 			req.Header.Set("User-Agent", self.userAgents["common"][0])
 		} else {
-			l := len(self.userAgents["all"])
+			l := len(self.userAgents["common"])
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
-			req.Header.Set("User-Agent", self.userAgents["all"][r.Intn(l)])
+			req.Header.Set("User-Agent", self.userAgents["common"][r.Intn(l)])
 		}
 	}
 
