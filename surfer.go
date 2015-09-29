@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/rand"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -17,6 +18,13 @@ import (
 	"github.com/henrylee2cn/surfer/agent"
 	"github.com/henrylee2cn/surfer/jar"
 	"github.com/henrylee2cn/surfer/util"
+)
+
+const (
+	TryTimes    = 3
+	Deadline    = 30 * time.Second
+	DialTimeout = 10 * time.Second
+	PauseTime   = 1 * time.Second
 )
 
 // Downloader represents an core of HTTP web browser for crawler.
@@ -30,25 +38,20 @@ type Surfer interface {
 	// SetTryTimes sets the tryTimes of download.
 	SetTryTimes(tryTimes int) Surfer
 
-	// SetPaseTime sets the pase time of retry.
-	SetPaseTime(paseTime time.Duration) Surfer
+	// SetDeadline sets the default deadline of connect.
+	SetDeadline(t time.Duration) Surfer
 
-	// Get requests the given URL using the GET method.
-	Get(u string, header http.Header, cookies []*http.Cookie) (*http.Response, error)
+	// SetDialTimeout sets the default  timeout of dial.
+	SetDialTimeout(t time.Duration) Surfer
 
-	// Open requests the given URL using the HEAD method.
-	Head(u string, header http.Header, cookies []*http.Cookie) (*http.Response, error)
+	// SetPauseTime sets the pase time of retry.
+	SetPauseTime(t time.Duration) Surfer
 
-	// Post requests the given URL using the POST method.
-	Post(u, ref string, contentType string, body io.Reader, header http.Header, cookies []*http.Cookie) (*http.Response, error)
-
-	// PostForm requests the given URL using the POST method with the given data.
-	PostForm(u, ref string, data url.Values, header http.Header, cookies []*http.Cookie) (*http.Response, error)
-
-	// PostMultipart requests the given URL using the POST method with the given data using multipart/form-data format.
-	PostMultipart(u, ref string, data url.Values, header http.Header, cookies []*http.Cookie) (*http.Response, error)
-
-	Download(method, u, ref string, data url.Values, header http.Header, cookies []*http.Cookie) (resp *http.Response, err error)
+	// GET @param url string, header http.Header, cookies []*http.Cookie
+	// HEAD @param url string, header http.Header, cookies []*http.Cookie
+	// POST PostForm @param url, referer string, values url.Values, header http.Header, cookies []*http.Cookie
+	// POST PostMultipart @param url, referer string, values url.Values, header http.Header, cookies []*http.Cookie
+	Download(Request) (resp *http.Response, err error)
 }
 
 // Default is the default Download implementation.
@@ -72,10 +75,26 @@ type Surf struct {
 	tryTimes int
 
 	// how long pase when retry
-	paseTime time.Duration
+	pauseTime time.Duration
+
+	deadline    time.Duration
+	dialTimeout time.Duration
 
 	// proxy host
 	proxy string
+}
+
+type Param struct {
+	method      string
+	url         *url.URL
+	referer     string
+	contentType string
+	body        io.Reader
+	header      http.Header
+	cookies     []*http.Cookie
+	client      *http.Client
+	pauseTime   time.Duration
+	deadline    time.Duration
 }
 
 func New() Surfer {
@@ -85,8 +104,10 @@ func New() Surfer {
 		cookieJar:      jar.NewCookiesMemory(),
 		sendReferer:    true,
 		followRedirect: true,
-		tryTimes:       3,
-		paseTime:       0,
+		tryTimes:       TryTimes,
+		deadline:       Deadline,
+		dialTimeout:    DialTimeout,
+		pauseTime:      PauseTime,
 		proxy:          "",
 	}
 }
@@ -112,9 +133,30 @@ func (self *Surf) SetTryTimes(tryTimes int) Surfer {
 	return self
 }
 
-// SetPaseTime sets the pase time of retry.
-func (self *Surf) SetPaseTime(paseTime time.Duration) Surfer {
-	self.paseTime = paseTime
+// SetDeadline sets the default deadline of connect.
+func (self *Surf) SetDeadline(t time.Duration) Surfer {
+	if t == 0 {
+		return self
+	}
+	self.deadline = t
+	return self
+}
+
+// SetDialTimeout sets the default  timeout of dial.
+func (self *Surf) SetDialTimeout(t time.Duration) Surfer {
+	if t == 0 {
+		return self
+	}
+	self.dialTimeout = t
+	return self
+}
+
+// SetPauseTime sets the pase time of retry.
+func (self *Surf) SetPauseTime(t time.Duration) Surfer {
+	if t == 0 {
+		return self
+	}
+	self.pauseTime = t
 	return self
 }
 
@@ -124,132 +166,89 @@ func (self *Surf) SetProxy(proxy string) Surfer {
 	return self
 }
 
-func (self *Surf) Download(method, u, ref string, data url.Values, header http.Header, cookies []*http.Cookie) (resp *http.Response, err error) {
-	switch strings.ToUpper(method) {
-	case "GET":
-		resp, err = self.Get(u, header, cookies)
-	case "HEAD":
-		resp, err = self.Head(u, header, cookies)
+func (self *Surf) Download(req Request) (resp *http.Response, err error) {
+	param, err := self.param(req)
+	if err != nil {
+		return nil, err
+	}
+
+	switch method := strings.ToUpper(req.GetMethod()); method {
+	case "GET", "HEAD":
+		param.method = method
+
 	case "POST":
-		resp, err = self.PostForm(u, ref, data, header, cookies)
+		param.method = method
+		param.contentType = "application/x-www-form-urlencoded"
+		param.body = strings.NewReader(req.GetPostData().Encode())
+
 	case "POST-M":
-		resp, err = self.PostMultipart(u, ref, data, header, cookies)
-	}
-
-	return resp, err
-}
-
-// Get requests the given URL using the GET method.
-func (self *Surf) Get(u string, header http.Header, cookies []*http.Cookie) (*http.Response, error) {
-	urlObj, err := util.UrlEncode(u)
-	if err != nil {
-		return nil, err
-	}
-	client := self.buildClient(urlObj.Scheme, self.proxy)
-	return self.httpGET(urlObj, "", header, cookies, client)
-}
-
-// Open requests the given URL using the HEAD method.
-func (self *Surf) Head(u string, header http.Header, cookies []*http.Cookie) (*http.Response, error) {
-	urlObj, err := util.UrlEncode(u)
-	if err != nil {
-		return nil, err
-	}
-	client := self.buildClient(urlObj.Scheme, self.proxy)
-	return self.httpHEAD(urlObj, "", header, cookies, client)
-}
-
-// PostForm requests the given URL using the POST method with the given data.
-func (self *Surf) PostForm(u, ref string, data url.Values, header http.Header, cookies []*http.Cookie) (*http.Response, error) {
-	return self.Post(u, ref, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()), header, cookies)
-}
-
-// PostMultipart requests the given URL using the POST method with the given data using multipart/form-data format.
-func (self *Surf) PostMultipart(u, ref string, data url.Values, header http.Header, cookies []*http.Cookie) (*http.Response, error) {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	for k, vs := range data {
-		for _, v := range vs {
-			writer.WriteField(k, v)
+		param.method = "POST"
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		for k, vs := range req.GetPostData() {
+			for _, v := range vs {
+				writer.WriteField(k, v)
+			}
 		}
-	}
-	err := writer.Close()
-	if err != nil {
-		return nil, err
-	}
-	return self.Post(u, ref, writer.FormDataContentType(), body, header, cookies)
-}
+		err := writer.Close()
+		if err != nil {
+			return nil, err
+		}
+		param.contentType = writer.FormDataContentType()
+		param.body = body
 
-// Post requests the given URL using the POST method.
-func (self *Surf) Post(u, ref, contentType string, body io.Reader, header http.Header, cookies []*http.Cookie) (*http.Response, error) {
-	urlObj, err := util.UrlEncode(u)
-	if err != nil {
-		return nil, err
+	default:
+		param.method = "GET"
 	}
-	client := self.buildClient(urlObj.Scheme, self.proxy)
-	return self.httpPOST(urlObj, ref, contentType, body, header, cookies, client)
+
+	return self.httpRequest(param)
 }
 
 // -- Unexported methods --
 
-// httpGET makes an HTTP GET request for the given URL.
-// When via is not nil, and sendReferer is true, the Referer header will
-// be set to ref.
-func (self *Surf) httpGET(u *url.URL, ref string, header http.Header, cookies []*http.Cookie, client *http.Client) (*http.Response, error) {
-	req, err := self.buildRequest("GET", u.String(), ref, nil, header, cookies)
+func (self *Surf) param(req Request) (param *Param, err error) {
+	param = new(Param)
+
+	param.url, err = util.UrlEncode(req.GetUrl())
 	if err != nil {
 		return nil, err
 	}
-	return self.httpRequest(req, client)
-}
 
-// httpHEAD makes an HTTP HEAD request for the given URL.
-// When via is not nil, and sendReferer is true, the Referer header will
-// be set to ref.
-func (self *Surf) httpHEAD(u *url.URL, ref string, header http.Header, cookies []*http.Cookie, client *http.Client) (*http.Response, error) {
-	req, err := self.buildRequest("HEAD", u.String(), ref, nil, header, cookies)
-	if err != nil {
-		return nil, err
+	param.deadline = req.GetDeadline()
+	if param.deadline == 0 {
+		param.deadline = self.deadline
 	}
-	return self.httpRequest(req, client)
-}
+	param.client = self.buildClient(param.url.Scheme, self.proxy, param.deadline)
 
-// httpPOST makes an HTTP POST request for the given URL.
-// When via is not nil, and sendReferer is true, the Referer header will
-// be set to ref.
-func (self *Surf) httpPOST(u *url.URL, ref string, contentType string, body io.Reader, header http.Header, cookies []*http.Cookie, client *http.Client) (*http.Response, error) {
-	req, err := self.buildRequest("POST", u.String(), ref, body, header, cookies)
-	if err != nil {
-		return nil, err
+	param.referer = req.GetReferer()
+	param.header = req.GetHeader()
+	param.cookies = req.GetCookies()
+
+	param.pauseTime = req.GetPauseTime()
+	if param.pauseTime == 0 {
+		param.pauseTime = self.pauseTime
 	}
-	req.Header.Add("Content-Type", contentType)
 
-	return self.httpRequest(req, client)
-}
-
-// send uses the given *http.Request to make an HTTP request.
-func (self *Surf) httpRequest(req *http.Request, client *http.Client) (resp *http.Response, err error) {
-	for i := 0; i < self.tryTimes; i++ {
-		resp, err = client.Do(req)
-		if err != nil {
-			time.Sleep(self.paseTime)
-			continue
-		}
-		break
-	}
-	return
+	return param, err
 }
 
 // buildClient creates, configures, and returns a *http.Client type.
-func (self *Surf) buildClient(scheme string, proxy string) *http.Client {
-	client := &http.Client{}
+func (self *Surf) buildClient(scheme string, proxy string, deadline time.Duration) *http.Client {
+	client := &http.Client{
+		Jar:           self.cookieJar,
+		CheckRedirect: self.checkRedirect,
+	}
 
-	client.Jar = self.cookieJar
-
-	client.CheckRedirect = self.checkRedirect
-
-	transport := &http.Transport{}
+	transport := &http.Transport{
+		Dial: func(network, addr string) (net.Conn, error) {
+			c, err := net.DialTimeout(network, addr, self.dialTimeout)
+			if err != nil {
+				return nil, err
+			}
+			c.SetDeadline(time.Now().Add(deadline))
+			return c, nil
+		},
+	}
 
 	if proxy != "" {
 		if px, err := url.Parse(proxy); err == nil {
@@ -261,21 +260,18 @@ func (self *Surf) buildClient(scheme string, proxy string) *http.Client {
 		transport.TLSClientConfig = &tls.Config{RootCAs: nil, InsecureSkipVerify: true}
 		transport.DisableCompression = true
 	}
-
 	client.Transport = transport
-
 	return client
 }
 
-// buildRequest creates and returns a *http.Request type.
-// Sets any headers that need to be sent with the request.
-func (self *Surf) buildRequest(method, url string, ref string, body io.Reader, header http.Header, cookies []*http.Cookie) (*http.Request, error) {
-	req, err := http.NewRequest(method, url, body)
+// send uses the given *http.Request to make an HTTP request.
+func (self *Surf) httpRequest(param *Param) (resp *http.Response, err error) {
+	req, err := http.NewRequest(param.method, param.url.String(), param.body)
 	if err != nil {
 		return nil, err
 	}
 
-	for k, v := range header {
+	for k, v := range param.header {
 		for _, vv := range v {
 			req.Header.Add(k, vv)
 		}
@@ -293,14 +289,27 @@ func (self *Surf) buildRequest(method, url string, ref string, body io.Reader, h
 	}
 
 	if self.sendReferer {
-		req.Header.Set("Referer", ref)
+		req.Header.Set("Referer", param.referer)
 	}
 
-	for _, cookie := range cookies {
+	for _, cookie := range param.cookies {
 		req.AddCookie(cookie)
 	}
 
-	return req, nil
+	if param.contentType != "" {
+		req.Header.Add("Content-Type", param.contentType)
+	}
+
+	for i := 0; i < self.tryTimes; i++ {
+		resp, err = param.client.Do(req)
+		if err != nil {
+			time.Sleep(param.pauseTime)
+			continue
+		}
+		break
+	}
+
+	return resp, err
 }
 
 // checkRedirect is used as the value to http.Client.CheckRedirect.
