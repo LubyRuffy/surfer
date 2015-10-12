@@ -18,7 +18,7 @@ type Param struct {
 	cookies       []*http.Cookie
 	enableCookie  bool
 	dialTimeout   time.Duration
-	deadline      time.Duration
+	connTimeout   time.Duration
 	tryTimes      int
 	retryPause    time.Duration
 	redirectTimes int

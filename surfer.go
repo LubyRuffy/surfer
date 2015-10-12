@@ -91,8 +91,13 @@ func (self *Surf) Download(req Request) (resp *http.Response, err error) {
 	param.header = req.GetHeader()
 	param.enableCookie = req.GetEnableCookie()
 	param.cookies = req.GetCookies()
+
 	param.dialTimeout = req.GetDialTimeout()
-	param.deadline = req.GetDeadline()
+	if param.dialTimeout < 0 {
+		param.dialTimeout = 0
+	}
+
+	param.connTimeout = req.GetConnTimeout()
 	param.tryTimes = req.GetTryTimes()
 	param.retryPause = req.GetRetryPause()
 	param.redirectTimes = req.GetRedirectTimes()
@@ -119,7 +124,9 @@ func (self *Surf) buildClient(param *Param) *http.Client {
 			if err != nil {
 				return nil, err
 			}
-			c.SetDeadline(time.Now().Add(param.deadline))
+			if param.connTimeout > 0 {
+				c.SetDeadline(time.Now().Add(param.connTimeout))
+			}
 			return c, nil
 		},
 	}

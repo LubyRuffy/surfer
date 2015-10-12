@@ -19,10 +19,10 @@ type Request interface {
 	GetCookies() []*http.Cookie
 	// enable http cookies
 	GetEnableCookie() bool
-	// timeout of dial
+	// dial tcp: i/o timeout
 	GetDialTimeout() time.Duration
-	// deadline of connect
-	GetDeadline() time.Duration
+	// WSARecv tcp: i/o timeout
+	GetConnTimeout() time.Duration
 	// the max times of download
 	GetTryTimes() int
 	// the pause time of retry
