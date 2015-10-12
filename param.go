@@ -28,12 +28,15 @@ type Param struct {
 
 // checkRedirect is used as the value to http.Client.CheckRedirect
 // when redirectTimes equal 0, redirect times is ∞
-// when redirectTimes less than 0, redirect times is 0
+// when redirectTimes less than 0, not allow redirects
 func (self *Param) checkRedirect(req *http.Request, via []*http.Request) error {
 	if self.redirectTimes == 0 {
 		return nil
 	}
 	if len(via) >= self.redirectTimes {
+		if self.redirectTimes < 0 {
+			return fmt.Errorf("not allow redirects.")
+		}
 		return fmt.Errorf("stopped after %v redirects.", self.redirectTimes)
 	}
 	return nil
