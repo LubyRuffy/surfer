@@ -44,6 +44,45 @@ type Request struct {
 	Proxy string
 }
 
+// 发送请求前的准备工作，设置一系列默认值
+// Request.Url与Request.Rule必须设置
+// Request.Spider无需手动设置(由系统自动设置)
+// Request.EnableCookie在Spider字段中统一设置，规则请求中指定的无效
+// 以下字段有默认值，可不设置:
+// Request.Method默认为GET方法;
+// Request.DialTimeout默认为常量DefaultDialTimeout，小于0时不限制等待响应时长;
+// Request.ConnTimeout默认为常量DefaultConnTimeout，小于0时不限制下载超时;
+// Request.TryTimes默认为常量DefaultTryTimes，小于0时不限制失败重载次数;
+// Request.RedirectTimes默认不限制重定向次数，小于0时可禁止重定向跳转;
+// Request.RetryPause默认为常量DefaultRetryPause.
+func (self *Request) Prepare() *Request {
+	if self.Method == "" {
+		self.Method = "GET"
+	}
+
+	if self.DialTimeout < 0 {
+		self.DialTimeout = 0
+	} else if self.DialTimeout == 0 {
+		self.DialTimeout = DefaultDialTimeout
+	}
+
+	if self.ConnTimeout < 0 {
+		self.ConnTimeout = 0
+	} else if self.ConnTimeout == 0 {
+		self.ConnTimeout = DefaultConnTimeout
+	}
+
+	if self.TryTimes == 0 {
+		self.TryTimes = DefaultTryTimes
+	}
+
+	if self.RetryPause <= 0 {
+		self.RetryPause = DefaultRetryPause
+	}
+
+	return self
+}
+
 func (self *Request) GetUrl() string {
 	return self.Url
 }
