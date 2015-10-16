@@ -162,12 +162,14 @@ func (self *Surf) httpRequest(param *Param) (resp *http.Response, err error) {
 		req.Header.Set("Referer", param.referer)
 	}
 
-	if param.enableCookie {
-		req.Header.Set("User-Agent", self.userAgents["common"][0])
-	} else {
-		l := len(self.userAgents["common"])
-		r := rand.New(rand.NewSource(time.Now().UnixNano()))
-		req.Header.Set("User-Agent", self.userAgents["common"][r.Intn(l)])
+	if len(req.Header.Get("User-Agent")) == 0 {
+		if param.enableCookie {
+			req.Header.Set("User-Agent", self.userAgents["common"][0])
+		} else {
+			l := len(self.userAgents["common"])
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			req.Header.Set("User-Agent", self.userAgents["common"][r.Intn(l)])
+		}
 	}
 
 	for _, cookie := range param.cookies {
@@ -178,13 +180,24 @@ func (self *Surf) httpRequest(param *Param) (resp *http.Response, err error) {
 		req.Header.Add("Content-Type", param.contentType)
 	}
 
-	for i := 0; i < param.tryTimes; i++ {
-		resp, err = param.client.Do(req)
-		if err != nil {
-			time.Sleep(param.retryPause)
-			continue
+	if param.tryTimes <= 0 {
+		for {
+			resp, err = param.client.Do(req)
+			if err != nil {
+				time.Sleep(param.retryPause)
+				continue
+			}
+			break
 		}
-		break
+	} else {
+		for i := 0; i < param.tryTimes; i++ {
+			resp, err = param.client.Do(req)
+			if err != nil {
+				time.Sleep(param.retryPause)
+				continue
+			}
+			break
+		}
 	}
 
 	return resp, err
