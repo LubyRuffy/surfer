@@ -31,4 +31,6 @@ type Request interface {
 	GetProxy() string
 	// max redirect times
 	GetRedirectTimes() int
+
+	GetTemp(key string) interface{}
 }
