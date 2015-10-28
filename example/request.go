@@ -42,6 +42,8 @@ type Request struct {
 	RedirectTimes int
 	// the download ProxyHost
 	Proxy string
+
+	Temp map[string]interface{}
 }
 
 // 发送请求前的准备工作，设置一系列默认值
@@ -133,4 +135,8 @@ func (self *Request) GetProxy() string {
 
 func (self *Request) GetRedirectTimes() int {
 	return self.RedirectTimes
+}
+
+func (self *Request) GetTemp(key string) interface{} {
+	return self.Temp[key]
 }

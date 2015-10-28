@@ -2,18 +2,18 @@ package surfer
 
 import (
 	"github.com/henrylee2cn/surfer/util"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // 基于Phantomjs的下载器实现，作为surfer的补充
 // 效率较surfer会慢很多，但是因为模拟浏览器，破防性更好
-
+// 支持UserAgent/TryTimes/RetryPause/自定义js
 type Phantom struct {
 	FullPhantomjsName    string          //Phantomjs完整文件名
 	FullTempJsFiles      map[string]bool //js临时文件存放完整文件名
@@ -31,55 +31,44 @@ func NewPhantom(fullPhantomjsName, fullTempJsFilePrefix string) Surfer {
 	return phantom
 }
 
-// 实现surfer下载器接口
+// 实现surfer下载器接口(userAgent 默认为百度爬虫)
 func (self *Phantom) Download(req Request) (resp *http.Response, err error) {
 	resp = new(http.Response)
-	ct := strings.ToLower(req.GetHeader().Get("Content-Type"))
-	idx := strings.Index(ct, "charset=")
-	if idx != -1 {
-		ct = strings.Trim(string(ct[idx+8:]), ";")
-		ct = strings.Trim(ct, " ")
+
+	encoding := strings.ToLower(req.GetHeader().Get("Content-Type"))
+	if idx := strings.Index(encoding, "charset="); idx != -1 {
+		encoding = strings.Trim(string(encoding[idx+8:]), ";")
+		encoding = strings.Trim(encoding, " ")
 	} else {
-		ct = "utf-8"
+		encoding = "utf-8"
 	}
-	var jsfile string
+
+	jsfile, _ := self.setFile(JS_CODE)
 	if js, ok := req.GetTemp("__JS__").(string); ok && js != "" {
-		jsfile, err = self.setFile(js)
-		if err != nil {
-			jsfile, _ = self.setFile(JS_CODE)
+		if _jsfile, err := self.setFile(js); err == nil {
+			jsfile = _jsfile
 		}
-	} else {
-		jsfile, _ = self.setFile(JS_CODE)
 	}
 
-	ua := strings.ToLower(req.GetHeader().Get("User-Agent"))
-	if ua == "" {
-		resp.Body, err = self.download(req.GetUrl(), ct, jsfile)
-	} else {
-		resp.Body, err = self.download(req.GetUrl(), ct, jsfile, ua)
+	args := []string{"/c", "start", "/b", self.FullPhantomjsName, jsfile, req.GetUrl(), encoding}
+	if userAgent := strings.ToLower(req.GetHeader().Get("User-Agent")); userAgent != "" {
+		args = append(args, userAgent)
 	}
+
+	for i := 0; i < req.GetTryTimes(); i++ {
+		cmd := exec.Command("cmd", args...)
+		if resp.Body, err = cmd.StdoutPipe(); err != nil {
+			time.Sleep(req.GetRetryPause())
+			continue
+		}
+		if cmd.Start() != nil || resp.Body == nil {
+			time.Sleep(req.GetRetryPause())
+			continue
+		}
+		break
+	}
+
 	return
-}
-
-//url 为请求地址
-//encoding 为页面编码
-//userAgent 为客户端代理请求设备，默认为百度爬虫
-func (self *Phantom) download(url, encoding, js string, userAgent ...string) (stdout io.ReadCloser, err error) {
-	args := []string{"/c", "start", "/b", self.FullPhantomjsName, js, url, encoding}
-	if len(userAgent) > 0 {
-		args = append(args, userAgent...)
-	}
-	cmd := exec.Command("cmd", args...)
-	stdout, err = cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	err = cmd.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	return stdout, err
 }
 
 func (self *Phantom) setFile(js string) (string, error) {
