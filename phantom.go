@@ -50,13 +50,13 @@ func (self *Phantom) Download(req Request) (resp *http.Response, err error) {
 		}
 	}
 
-	args := []string{"/c", "start", "/b", self.FullPhantomjsName, jsfile, req.GetUrl(), encoding}
+	args := []string{jsfile, req.GetUrl(), encoding}
 	if userAgent := strings.ToLower(req.GetHeader().Get("User-Agent")); userAgent != "" {
 		args = append(args, userAgent)
 	}
 
 	for i := 0; i < req.GetTryTimes(); i++ {
-		cmd := exec.Command("cmd", args...)
+		cmd := exec.Command(self.FullPhantomjsName, args...)
 		if resp.Body, err = cmd.StdoutPipe(); err != nil {
 			time.Sleep(req.GetRetryPause())
 			continue
