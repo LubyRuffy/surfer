@@ -23,16 +23,12 @@ type Surf struct {
 
 	// cookies stores cookies for every site visited by the browser.
 	cookieJar http.CookieJar
-
-	// can sends referer
-	sendReferer bool
 }
 
 func New() Surfer {
 	surf := &Surf{
-		userAgents:  agent.UserAgents,
-		cookieJar:   jar.NewCookiesMemory(),
-		sendReferer: true,
+		userAgents: agent.UserAgents,
+		cookieJar:  jar.NewCookiesMemory(),
 	}
 	l := len(surf.userAgents["common"])
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -77,10 +73,8 @@ func (self *Surf) Download(req Request) (resp *http.Response, err error) {
 		param.method = "GET"
 	}
 
-	param.referer = req.GetReferer()
 	param.header = req.GetHeader()
 	param.enableCookie = req.GetEnableCookie()
-	param.cookies = req.GetCookies()
 
 	param.dialTimeout = req.GetDialTimeout()
 	if param.dialTimeout < 0 {
@@ -142,14 +136,14 @@ func (self *Surf) httpRequest(param *Param) (resp *http.Response, err error) {
 		return nil, err
 	}
 
+	if param.contentType != "" {
+		req.Header.Set("Content-Type", param.contentType)
+	}
+
 	for k, v := range param.header {
 		for _, vv := range v {
 			req.Header.Add(k, vv)
 		}
-	}
-
-	if self.sendReferer {
-		req.Header.Set("Referer", param.referer)
 	}
 
 	if len(req.Header.Get("User-Agent")) == 0 {
@@ -160,14 +154,6 @@ func (self *Surf) httpRequest(param *Param) (resp *http.Response, err error) {
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
 			req.Header.Set("User-Agent", self.userAgents["common"][r.Intn(l)])
 		}
-	}
-
-	for _, cookie := range param.cookies {
-		req.AddCookie(cookie)
-	}
-
-	if param.contentType != "" {
-		req.Header.Add("Content-Type", param.contentType)
 	}
 
 	if param.tryTimes <= 0 {

@@ -10,13 +10,10 @@ type Request interface {
 	GetUrl() string
 	// GET POST POST-M HEAD
 	GetMethod() string
-	GetReferer() string
 	// POST values
 	GetPostData() url.Values
 	// http header
 	GetHeader() http.Header
-	// http cookies, when Cookies equal nil, the UserAgent auto changes
-	GetCookies() []*http.Cookie
 	// enable http cookies
 	GetEnableCookie() bool
 	// dial tcp: i/o timeout

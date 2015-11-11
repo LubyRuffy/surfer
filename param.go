@@ -11,11 +11,9 @@ import (
 type Param struct {
 	method        string
 	url           *url.URL
-	referer       string
 	contentType   string
 	body          io.Reader
 	header        http.Header
-	cookies       []*http.Cookie
 	enableCookie  bool
 	dialTimeout   time.Duration
 	connTimeout   time.Duration
