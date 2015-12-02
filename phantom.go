@@ -3,6 +3,7 @@ package surfer
 import (
 	"github.com/henrylee2cn/surfer/util"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,6 +35,9 @@ func NewPhantom(fullPhantomjsName, fullTempJsFilePrefix string) Surfer {
 // 实现surfer下载器接口(userAgent 默认为百度爬虫)
 func (self *Phantom) Download(req Request) (resp *http.Response, err error) {
 	resp = new(http.Response)
+	resp.Request = new(http.Request)
+	resp.Request.Header = req.GetHeader()
+	resp.Request.URL, _ = url.Parse(req.GetUrl())
 
 	encoding := strings.ToLower(req.GetHeader().Get("Content-Type"))
 	if idx := strings.Index(encoding, "charset="); idx != -1 {
