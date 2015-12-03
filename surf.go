@@ -1,95 +1,36 @@
 package surfer
 
 import (
-	"bytes"
 	"crypto/tls"
 	"math/rand"
-	"mime/multipart"
 	"net"
 	"net/http"
-	"net/url"
+	"net/http/cookiejar"
 	"strings"
 	"time"
 
 	"github.com/henrylee2cn/surfer/agent"
-	"github.com/henrylee2cn/surfer/jar"
-	"github.com/henrylee2cn/surfer/util"
 )
 
 // Default is the default Download implementation.
-type Surf struct {
-	// userAgent is the User-Agent header value sent with requests.
-	userAgents map[string][]string
-
-	// cookies stores cookies for every site visited by the browser.
-	cookieJar http.CookieJar
-}
+type Surf struct{}
 
 func New() Surfer {
-	surf := &Surf{
-		userAgents: agent.UserAgents,
-		cookieJar:  jar.NewCookiesMemory(),
-	}
-	l := len(surf.userAgents["common"])
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	idx := r.Intn(l)
-	surf.userAgents["common"][0], surf.userAgents["common"][idx] = surf.userAgents["common"][idx], surf.userAgents["common"][0]
-
-	return surf
+	return new(Surf)
 }
 
-func (self *Surf) Download(req Request) (resp *http.Response, err error) {
-	var param = new(Param)
+var cookieJar, _ = cookiejar.New(nil)
 
-	param.url, err = util.UrlEncode(req.GetUrl())
+func (self *Surf) Download(req Request) (resp *http.Response, err error) {
+	param, err := NewParam(req)
 	if err != nil {
 		return nil, err
 	}
 
-	switch method := strings.ToUpper(req.GetMethod()); method {
-	case "GET", "HEAD":
-		param.method = method
-	case "POST":
-		param.method = method
-		param.contentType = "application/x-www-form-urlencoded"
-		param.body = strings.NewReader(req.GetPostData().Encode())
-	case "POST-M":
-		param.method = "POST"
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-		for k, vs := range req.GetPostData() {
-			for _, v := range vs {
-				writer.WriteField(k, v)
-			}
-		}
-		err := writer.Close()
-		if err != nil {
-			return nil, err
-		}
-		param.contentType = writer.FormDataContentType()
-		param.body = body
-
-	default:
-		param.method = "GET"
-	}
-
-	param.header = req.GetHeader()
-	param.enableCookie = req.GetEnableCookie()
-
-	param.dialTimeout = req.GetDialTimeout()
-	if param.dialTimeout < 0 {
-		param.dialTimeout = 0
-	}
-
-	param.connTimeout = req.GetConnTimeout()
-	param.tryTimes = req.GetTryTimes()
-	param.retryPause = req.GetRetryPause()
-	param.redirectTimes = req.GetRedirectTimes()
-	param.proxy = req.GetProxy()
-
 	param.client = self.buildClient(param)
-
-	return self.httpRequest(param)
+	resp, err = self.httpRequest(param)
+	param.writeback(resp)
+	return
 }
 
 // buildClient creates, configures, and returns a *http.Client type.
@@ -99,7 +40,7 @@ func (self *Surf) buildClient(param *Param) *http.Client {
 	}
 
 	if param.enableCookie {
-		client.Jar = self.cookieJar
+		client.Jar = cookieJar
 	}
 
 	transport := &http.Transport{
@@ -115,10 +56,8 @@ func (self *Surf) buildClient(param *Param) *http.Client {
 		},
 	}
 
-	if param.proxy != "" {
-		if px, err := url.Parse(param.proxy); err == nil {
-			transport.Proxy = http.ProxyURL(px)
-		}
+	if param.proxy != nil {
+		transport.Proxy = http.ProxyURL(param.proxy)
 	}
 
 	if strings.ToLower(param.url.Scheme) == "https" {
@@ -136,30 +75,17 @@ func (self *Surf) httpRequest(param *Param) (resp *http.Response, err error) {
 		return nil, err
 	}
 
-	if param.contentType != "" {
-		req.Header.Set("Content-Type", param.contentType)
-	}
-
-	for k, v := range param.header {
-		for _, vv := range v {
-			req.Header.Add(k, vv)
-		}
-	}
-
-	if len(req.Header.Get("User-Agent")) == 0 {
-		if param.enableCookie {
-			req.Header.Set("User-Agent", self.userAgents["common"][0])
-		} else {
-			l := len(self.userAgents["common"])
-			r := rand.New(rand.NewSource(time.Now().UnixNano()))
-			req.Header.Set("User-Agent", self.userAgents["common"][r.Intn(l)])
-		}
-	}
+	req.Header = param.header
 
 	if param.tryTimes <= 0 {
 		for {
 			resp, err = param.client.Do(req)
 			if err != nil {
+				if !param.enableCookie {
+					l := len(agent.UserAgents["common"])
+					r := rand.New(rand.NewSource(time.Now().UnixNano()))
+					req.Header.Set("User-Agent", agent.UserAgents["common"][r.Intn(l)])
+				}
 				time.Sleep(param.retryPause)
 				continue
 			}
@@ -169,6 +95,11 @@ func (self *Surf) httpRequest(param *Param) (resp *http.Response, err error) {
 		for i := 0; i < param.tryTimes; i++ {
 			resp, err = param.client.Do(req)
 			if err != nil {
+				if !param.enableCookie {
+					l := len(agent.UserAgents["common"])
+					r := rand.New(rand.NewSource(time.Now().UnixNano()))
+					req.Header.Set("User-Agent", agent.UserAgents["common"][r.Intn(l)])
+				}
 				time.Sleep(param.retryPause)
 				continue
 			}

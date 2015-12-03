@@ -8,9 +8,11 @@ package agent
 
 import (
 	"bytes"
+	"math/rand"
 	"runtime"
 	"strings"
 	"text/template"
+	"time"
 )
 
 const (
@@ -223,6 +225,11 @@ func init() {
 			}
 		}
 	}
+	l := len(UserAgents["common"])
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	idx := r.Intn(l)
+	UserAgents["all"][0], UserAgents["all"][idx] = UserAgents["all"][idx], UserAgents["all"][0]
+	UserAgents["common"][0], UserAgents["common"][idx] = UserAgents["common"][idx], UserAgents["common"][0]
 }
 
 // Create generates and returns a complete user agent string.

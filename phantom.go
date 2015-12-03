@@ -3,7 +3,6 @@ package surfer
 import (
 	"github.com/henrylee2cn/surfer/util"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,12 +33,15 @@ func NewPhantom(fullPhantomjsName, fullTempJsFilePrefix string) Surfer {
 
 // 实现surfer下载器接口(userAgent 默认为百度爬虫)
 func (self *Phantom) Download(req Request) (resp *http.Response, err error) {
+	param, err := NewParam(req)
+	if err != nil {
+		return nil, err
+	}
 	resp = new(http.Response)
 	resp.Request = new(http.Request)
-	resp.Request.Header = req.GetHeader()
-	resp.Request.URL, _ = url.Parse(req.GetUrl())
+	param.writeback(resp)
 
-	encoding := strings.ToLower(req.GetHeader().Get("Content-Type"))
+	encoding := strings.ToLower(param.header.Get("Content-Type"))
 	if idx := strings.Index(encoding, "charset="); idx != -1 {
 		encoding = strings.Trim(string(encoding[idx+8:]), ";")
 		encoding = strings.Trim(encoding, " ")
@@ -54,19 +56,16 @@ func (self *Phantom) Download(req Request) (resp *http.Response, err error) {
 		}
 	}
 
-	args := []string{jsfile, req.GetUrl(), encoding}
-	if userAgent := strings.ToLower(req.GetHeader().Get("User-Agent")); userAgent != "" {
-		args = append(args, userAgent)
-	}
+	args := []string{jsfile, req.GetUrl(), encoding, strings.ToLower(param.header.Get("User-Agent"))}
 
-	for i := 0; i < req.GetTryTimes(); i++ {
+	for i := 0; i < param.tryTimes; i++ {
 		cmd := exec.Command(self.FullPhantomjsName, args...)
 		if resp.Body, err = cmd.StdoutPipe(); err != nil {
-			time.Sleep(req.GetRetryPause())
+			time.Sleep(param.retryPause)
 			continue
 		}
 		if cmd.Start() != nil || resp.Body == nil {
-			time.Sleep(req.GetRetryPause())
+			time.Sleep(param.retryPause)
 			continue
 		}
 		break
