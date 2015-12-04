@@ -31,7 +31,7 @@ func NewPhantom(fullPhantomjsName, fullTempJsFilePrefix string) Surfer {
 	return phantom
 }
 
-// 实现surfer下载器接口(userAgent 默认为百度爬虫)
+// 实现surfer下载器接口
 func (self *Phantom) Download(req Request) (resp *http.Response, err error) {
 	param, err := NewParam(req)
 	if err != nil {
