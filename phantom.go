@@ -37,9 +37,7 @@ func (self *Phantom) Download(req Request) (resp *http.Response, err error) {
 	if err != nil {
 		return nil, err
 	}
-	resp = new(http.Response)
-	resp.Request = new(http.Request)
-	param.writeback(resp)
+	resp = param.writeback(resp)
 
 	encoding := strings.ToLower(param.header.Get("Content-Type"))
 	if idx := strings.Index(encoding, "charset="); idx != -1 {
