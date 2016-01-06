@@ -1,6 +1,6 @@
 # surfer    [![GoDoc](https://godoc.org/github.com/tsuna/gohbase?status.png)](https://godoc.org/github.com/henrylee2cn/surfer) [![GitHub release](https://img.shields.io/github/release/henrylee2cn/surfer.svg)](https://github.com/henrylee2cn/surfer/releases)
 
-High Level Concurrency Downloader.
+A high level concurrency downloader.
 
 </br>
 surfer是一款Go语言编写的高并发爬虫下载器，拥有surf与phantom两种下载内核。
