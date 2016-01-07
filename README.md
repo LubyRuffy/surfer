@@ -51,3 +51,5 @@ func main() {
     surfer.DestroyJsFiles()
 }
 ```
+
+详情参考：[example.go](https://github.com/henrylee2cn/surfer/blob/master/example/example.go)
