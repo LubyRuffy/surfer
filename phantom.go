@@ -100,7 +100,7 @@ func (self *Phantom) Download(req Request) (resp *http.Response, err error) {
 			continue
 		}
 		resp.Header = param.header
-		resp.Header.Set("Cookie", retResp.Cookie)
+		resp.Header.Set("Set-Cookie", retResp.Cookie)
 		resp.Body = ioutil.NopCloser(strings.NewReader(retResp.Body))
 		break
 	}
