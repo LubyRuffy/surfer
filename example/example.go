@@ -11,11 +11,13 @@ func main() {
 	// 默认使用surf内核下载
 	log.Println("********************************************* surf内核GET下载测试开始 *********************************************")
 	resp, err := surfer.Download(&surfer.DefaultRequest{
-		Url: "http://github.com/henrylee2cn/surfer",
+		Url: "http://www.baidu.com/",
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println(resp.Header)
+
 	b, err := ioutil.ReadAll(resp.Body)
 	log.Println(string(b), err)
 
@@ -31,6 +33,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println(resp.Header)
+
 	b, err = ioutil.ReadAll(resp.Body)
 	log.Println(string(b), err)
 
@@ -40,12 +44,14 @@ func main() {
 
 	// 指定使用phantomjs内核下载
 	resp, err = surfer.Download(&surfer.DefaultRequest{
-		Url:          "http://github.com/henrylee2cn/surfer",
+		Url:          "http://www.baidu.com/",
 		DownloaderID: 1,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println(resp.Header)
+
 	b, err = ioutil.ReadAll(resp.Body)
 	log.Println(string(b), err)
 
@@ -63,6 +69,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println(resp.Header)
+
 	b, err = ioutil.ReadAll(resp.Body)
 	log.Println(string(b), err)
 
