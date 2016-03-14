@@ -8,12 +8,12 @@ import (
 )
 
 var (
-	surf                 Surfer
-	phantom              Surfer
-	once_surf            sync.Once
-	once_phantom         sync.Once
-	fullTempJsFilePrefix = "./tmp/phantomjs"
-	fullPhantomjsName    = os.Getenv("GOPATH") + "/src/github.com/henrylee2cn/surfer/phantomjs/phantomjs"
+	surf          Surfer
+	phantom       Surfer
+	once_surf     sync.Once
+	once_phantom  sync.Once
+	tempJsDir     = "./tmp"
+	phantomjsFile = os.Getenv("GOPATH") + `\src\github.com\henrylee2cn\surfer\phantomjs\phantomjs`
 )
 
 func Download(req Request) (resp *http.Response, err error) {
@@ -22,7 +22,7 @@ func Download(req Request) (resp *http.Response, err error) {
 		once_surf.Do(func() { surf = New() })
 		resp, err = surf.Download(req)
 	case PhomtomJsID:
-		once_phantom.Do(func() { phantom = NewPhantom(fullPhantomjsName, fullTempJsFilePrefix) })
+		once_phantom.Do(func() { phantom = NewPhantom(phantomjsFile, tempJsDir) })
 		resp, err = phantom.Download(req)
 	}
 	return
