@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/henrylee2cn/pholcus/app/downloader/surfer/agent"
+	"github.com/henrylee2cn/surfer/agent"
 )
 
 // Default is the default Download implementation.

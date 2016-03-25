@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/henrylee2cn/pholcus/app/downloader/surfer/agent"
-	"github.com/henrylee2cn/pholcus/app/downloader/surfer/util"
+	"github.com/henrylee2cn/surfer/agent"
+	"github.com/henrylee2cn/surfer/util"
 )
 
 type Param struct {
