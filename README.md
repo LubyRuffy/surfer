@@ -53,3 +53,9 @@ func main() {
 ```
 
 详情参考：[example.go](https://github.com/henrylee2cn/surfer/blob/master/example/example.go)
+
+&nbsp;
+
+#### 开源协议
+
+Pholcus（幽灵蛛）项目采用商业应用友好的[Apache License v2](https://github.com/henrylee2cn/surfer/raw/master/LICENSE).发布
