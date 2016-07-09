@@ -58,4 +58,4 @@ func main() {
 
 #### 开源协议
 
-surfer项目采用商业应用友好的[Apache License v2](https://github.com/henrylee2cn/surfer/raw/master/LICENSE).发布
+surfer 项目采用商业应用友好的[Apache License v2](https://github.com/henrylee2cn/surfer/raw/master/LICENSE).发布
