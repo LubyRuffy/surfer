@@ -1,4 +1,4 @@
-example.exe
+example/*.exe
 phantomjs/*
 *.exe
 *.rar
