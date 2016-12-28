@@ -16,6 +16,7 @@ package surfer
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"log"
 	"mime"
@@ -66,66 +67,68 @@ func NewPhantom(phantomjsFile, tempJsDir string) Surfer {
 }
 
 // 实现surfer下载器接口
-func (self *Phantom) Download(req Request) (resp *http.Response, err error) {
+func (self *Phantom) Download(req *Request) (resp *http.Response, err error) {
+	err = req.prepare()
+	if err != nil {
+		return
+	}
 	var encoding = "utf-8"
-	if _, params, err := mime.ParseMediaType(req.GetHeader().Get("Content-Type")); err == nil {
+	if _, params, err := mime.ParseMediaType(req.Header.Get("Content-Type")); err == nil {
 		if cs, ok := params["charset"]; ok {
 			encoding = strings.ToLower(strings.TrimSpace(cs))
 		}
 	}
 
-	req.GetHeader().Del("Content-Type")
+	req.Header.Del("Content-Type")
 
-	param, err := NewParam(req)
-	if err != nil {
-		return nil, err
-	}
-	resp = param.writeback(resp)
+	resp = req.writeback(resp)
 
 	var args []string
-	switch req.GetMethod() {
+	switch req.Method {
 	case "GET":
 		args = []string{
 			self.jsFileMap["get"],
-			req.GetUrl(),
-			param.header.Get("Cookie"),
+			req.Url,
+			req.Header.Get("Cookie"),
 			encoding,
-			param.header.Get("User-Agent"),
+			req.Header.Get("User-Agent"),
 		}
-	case "POST", "POST-M":
+	case "POST":
 		args = []string{
 			self.jsFileMap["post"],
-			req.GetUrl(),
-			param.header.Get("Cookie"),
+			req.Url,
+			req.Header.Get("Cookie"),
 			encoding,
-			param.header.Get("User-Agent"),
-			req.GetPostData(),
+			req.Header.Get("User-Agent"),
+			req.Values.Encode(),
 		}
+	default:
+		return nil, errors.New("Unsupported HTTP method: " + req.Method)
 	}
 
-	for i := 0; i < param.tryTimes; i++ {
+	for i := 0; i < req.TryTimes; i++ {
 		cmd := exec.Command(self.PhantomjsFile, args...)
 		if resp.Body, err = cmd.StdoutPipe(); err != nil {
-			time.Sleep(param.retryPause)
+			time.Sleep(req.RetryPause)
 			continue
 		}
 		if cmd.Start() != nil || resp.Body == nil {
-			time.Sleep(param.retryPause)
+			time.Sleep(req.RetryPause)
 			continue
 		}
 		var b []byte
 		b, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
-			time.Sleep(param.retryPause)
+			time.Sleep(req.RetryPause)
 			continue
 		}
 		retResp := Response{}
 		err = json.Unmarshal(b, &retResp)
 		if err != nil {
-			time.Sleep(param.retryPause)
+			time.Sleep(req.RetryPause)
 			continue
 		}
-		resp.Header = param.header
+		resp.Header = req.Header
 		resp.Header.Set("Set-Cookie", retResp.Cookie)
 		resp.Body = ioutil.NopCloser(strings.NewReader(retResp.Body))
 		break
