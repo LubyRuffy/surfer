@@ -48,7 +48,7 @@ type Request struct {
 	// 是否使用cookies，在Spider的EnableCookie设置
 	EnableCookie bool
 	// request body interface
-	Body Body
+	Body body
 	body io.Reader
 	// dial tcp: i/o timeout
 	DialTimeout time.Duration

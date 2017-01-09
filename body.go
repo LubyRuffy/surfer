@@ -26,8 +26,8 @@ import (
 	"strings"
 )
 
-// Body set request body
-type Body interface {
+// body set request body
+type body interface {
 	SetBody(*Request) error
 }
 
@@ -37,7 +37,7 @@ type Content struct {
 	Bytes       []byte
 }
 
-var _ Body = new(Content)
+var _ body = new(Content)
 
 // SetBody sets request body
 func (c *Content) SetBody(r *Request) error {
@@ -49,7 +49,7 @@ func (c *Content) SetBody(r *Request) error {
 // Bytes bytes type of body content, without content type
 type Bytes []byte
 
-var _ Body = Bytes("")
+var _ body = Bytes("")
 
 // SetBody sets request body
 func (b Bytes) SetBody(r *Request) error {
@@ -58,7 +58,7 @@ func (b Bytes) SetBody(r *Request) error {
 }
 
 type (
-	// Form impletes Body interface
+	// Form impletes body interface
 	Form struct {
 		// Values [field name]-[]value
 		Values map[string][]string
@@ -72,7 +72,7 @@ type (
 	}
 )
 
-var _ Body = new(Form)
+var _ body = new(Form)
 
 // SetBody sets request body
 func (f Form) SetBody(r *Request) error {
@@ -112,7 +112,7 @@ func (f Form) SetBody(r *Request) error {
 // JSONObj JSON type of body content
 type JSONObj struct{ Data interface{} }
 
-var _ Body = new(JSONObj)
+var _ body = new(JSONObj)
 
 // SetBody sets request body
 func (obj *JSONObj) SetBody(r *Request) error {
@@ -131,7 +131,7 @@ func (obj *JSONObj) SetBody(r *Request) error {
 // XMLObj XML type of body content
 type XMLObj struct{ Data interface{} }
 
-var _ Body = new(XMLObj)
+var _ body = new(XMLObj)
 
 // SetBody sets request body
 func (obj *XMLObj) SetBody(r *Request) error {
